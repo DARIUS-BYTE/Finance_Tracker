@@ -1,0 +1,92 @@
+document.getElementById('entryForm').addEventListener('submit', addOrUpdateEntry);
+document.getElementById('exportButton').addEventListener('click', exportFile);
+
+const entries = [];
+
+function addOrUpdateEntry(e) {
+    e.preventDefault();
+    
+    const description = document.getElementById('description').value;
+    const amount = parseFloat(document.getElementById('amount').value);
+    const type = document.getElementById('type').value;
+    
+    const existingEntryIndex = entries.findIndex(entry => entry.description === description && entry.type === type);
+    
+    if (existingEntryIndex > -1) {
+        entries[existingEntryIndex].amount = amount;
+    } else {
+        const entry = { description, amount, type };
+        entries.push(entry);
+    }
+    
+    displayEntries();
+    calculateSummary();
+    renderChart();
+}
+
+function displayEntries() {
+    const tbody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
+    tbody.innerHTML = '';
+    
+    entries.forEach(entry => {
+        const row = tbody.insertRow();
+        const cell1 = row.insertCell(0);
+        const cell2 = row.insertCell(1);
+        const cell3 = row.insertCell(2);
+        
+        cell1.textContent = entry.description;
+        cell2.textContent = entry.amount.toFixed(2);
+        cell3.textContent = entry.type;
+    });
+}
+
+function calculateSummary() {
+    const totalIncome = entries.filter(entry => entry.type === 'income').reduce((sum, entry) => sum + entry.amount, 0);
+    const totalExpense = entries.filter(entry => entry.type === 'expense').reduce((sum, entry) => sum + entry.amount, 0);
+    
+    const incomeExpenseRatio = totalIncome / (totalExpense || 1); // Avoid division by zero
+    document.getElementById('incomeExpenseRatio').textContent = `Income/Expense Ratio: ${incomeExpenseRatio.toFixed(2)}`;
+
+    const expensePercentage = totalExpense / (totalIncome || 1) * 100; // Avoid division by zero
+    document.getElementById('expensePercentage').textContent = `Expense Percentage: ${expensePercentage.toFixed(2)}%`;
+}
+
+function renderChart() {
+    const expenseCategories = entries.filter(entry => entry.type === 'expense').map(entry => entry.description);
+    const expenseAmounts = entries.filter(entry => entry.type === 'expense').map(entry => entry.amount);
+
+    const ctx = document.getElementById('pieChart').getContext('2d');
+    if (window.myPieChart) {
+        window.myPieChart.destroy();
+    }
+    window.myPieChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: expenseCategories,
+            datasets: [{
+                data: expenseAmounts,
+                backgroundColor: expenseAmounts.map((_, i) => `hsl(${i * 60}, 70%, 50%)`)
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+}
+
+function exportFile() {
+    const data = [['Description', 'Amount', 'Type']];
+    entries.forEach(entry => {
+        data.push([entry.description, entry.amount, entry.type]);
+    });
+    
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+    XLSX.writeFile(workbook, 'Finance_Tracker.xlsx');
+}
